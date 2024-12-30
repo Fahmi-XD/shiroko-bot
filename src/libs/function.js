@@ -4,6 +4,11 @@ import path from "path";
 import mimes from "mime-types";
 import * as Jimp from "jimp";
 import { fileTypeFromBuffer } from "file-type";
+import { createRequire } from "module";
+import readline from "readline"
+const require = createRequire(import.meta.url)
+
+import config from "../../src/settings/config.js";
 import colors from "./colors.js";
 
 export function isUrl(url) {
@@ -191,7 +196,8 @@ export async function resizeImage(buffer, height) {
 export async function loadPlugins() {
     try {
         let plugins = [];
-        console.log(`[ ${colors.green("System")} ] Mengambil semua Plugin...`);
+
+        console.log(`[ ${colors.green("System")} ] Mengambil semua Plugin & Case...`);
         let extendPluginsDefault = {
             /** Function lokal yang hanya bisa diginakan di file plugins yang sama */
             func: [],
@@ -204,9 +210,6 @@ export async function loadPlugins() {
 
             /** Function khusus untuk public atau user ( Jika ingin membuat function khsus untuk user / public yang berbeda dengan owner ) */
             publicRun: async () => { },
-
-            /** Command */
-            cmd: [],
 
             /** Kategory untuk command */
             cats: [],
@@ -249,6 +252,9 @@ export async function loadPlugins() {
 
             /** Apakah hanya admin group yang bisa menggunakan command ini? */
             admin: false,
+
+            /** Command */
+            cmd: [],
         }
         let current = [];
         let handler = async () => {
@@ -294,37 +300,59 @@ export async function loadPlugins() {
 
                 add: (extendPlugins) => {
                     try {
-                        if (!extendPlugins.cmd?.length) extendPlugins.cmd = ["pass"];
+                        if (!extendPlugins.cmd?.length) extendPlugins.cmd = ["functionkhususuntukpemanggilankode"];
                         if (extendPlugins.cprefix?.length) extendPlugins.cmd = ["x-dev"];
                         !(extendPlugins.active ?? extendPluginsDefault.active) ? extendPlugins.cmd?.length || extendPlugins.pass ? extendPlugins.cats = [] : null : null;
                         !(extendPlugins.active ?? extendPluginsDefault.active) ? null : extendPlugins.cmd?.length || extendPlugins.pass ? !current.some(v => v.func.length) ? current.push(Object.assign({}, extendPluginsDefault, extendPlugins)) : current[0] = (Object.assign({}, extendPluginsDefault, extendPlugins, { func: current[0].func })) : null;
                     } catch (e) {
                         console.log(e)
                     }
+                },
+
+                case: (functionCase) => {
+                    try {
+                        global.ev.case.add(functionCase);
+                    } catch (e) {
+                        console.log(e)
+                    }
                 }
             }
         };
-        const readFolder = async (jalur) => {
+
+        const readFolder = async (jalur, type = "module") => {
             try {
                 const f = await fs.readdirSync(jalur);
+
                 for (const ff of f) {
+                    const resolvedPath = path.resolve(path.join(jalur, ff))
+                    if (require.cache[resolvedPath]) {
+                        delete require.cache[resolvedPath]
+                    }
+
                     if (ff.startsWith("__")) {
                         continue
                     } else if (await fs.statSync(path.join(jalur, ff)).isDirectory()) {
                         await readFolder(path.join(jalur, ff))
                     } else {
-                        await (await (await import("file://" + path.join(process.cwd(), jalur, ff))).default)(await handler());
+                        if (ff.endsWith(".js") || ff.endsWith(".mjs") && type == "module") {
+                            await (await (await import("file://" + path.join(process.cwd(), jalur, ff))).default)(await handler(), config);
+                        } else if (ff.endsWith(".cjs") && type == "commonjs") {
+                            const require = createRequire(import.meta.url);
+                            (await handler()).case(await require(path.join(global.__dirname, jalur, ff)));
+                        }
+
                         plugins.push(...current)
                         current = null
                         current = []
                     }
                 }
+
             } catch (e) {
                 console.log(e)
             }
         };
 
-        await readFolder("plugins");
+        await Promise.all([await readFolder("plugins", "module"), await readFolder("case", "commonjs")])
         for (const pl of plugins) {
             if (pl.funcInit.length != 0) {
                 for (const f of pl.funcInit) {
@@ -337,7 +365,23 @@ export async function loadPlugins() {
             }
         }
 
-        console.log(`[ ${colors.green("System")} ] ${Object.keys(plugins).length} Total plugin`);
+        console.log(`[ ${colors.green("System")} ] ${Object.keys(plugins).length} Total Plugin`);
+        let len = 0;
+        for (const v of await fs.readdirSync("./case")) {
+            const stream = fs.createReadStream("./case/" + v)
+            const rl = readline.createInterface({
+                input: stream,
+                crlfDelay: Infinity
+            })
+            for await (const line of rl) {
+                const cas = line.trim().match(/case\s+['"](.+?)['"]:\s?\{/);
+                cas ? global.ev.caseCmd.add(cas[1]) : null;
+                len += cas ? 1 : 0;
+            }
+        }
+        
+        plugins = plugins.filter(v => !v.cmd.includes("functionkhususuntukpemanggilankode"))
+        console.log(`[ ${colors.green("System")} ] ${len} Total Case`);
         console.log(`[ ${colors.green("System")} ] Mengkonversi ...`);
         for (const v of plugins) {
             (v.cmd.length != 0 ? v.cmd.flat() : ["Syntx"]).forEach((e) => {

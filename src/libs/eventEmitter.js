@@ -6,6 +6,8 @@ class EventEmitter {
   constructor() {
     this.events = new Map();
     this.globalFunction = new Map();
+    this.case = new Set();
+    this.caseCmd = new Set();
     this.sys = {};
     this.exp = {};
   }
@@ -54,7 +56,7 @@ class EventEmitter {
       this.exp = {};
 
       const { command: cmds, m, sock } = event;
-      const command = this.events.has(cmds) ? cmds : "pass";
+      const command = this.events.has(cmds) ? cmds : this.caseCmd.has(cmds) ? cmds : "pass";
       const { from, pushName, sender, body, isGroup } = m;
       senders = sender;
       const prefix = config.options.prefix;
@@ -64,16 +66,14 @@ class EventEmitter {
       const cmd = prefix.test(m.body)
         ? (prefix.test(m.body) ? body.slice(1) : body).split(" ")[0]
         : parseCommand[0];
+      console.log(command)
 
       const dpluginCall =
         command == "pass"
           ? this.events.get("pass")
-          : [...this.events]
-            .filter(([key, value]) => value[0].cmd[0] instanceof RegExp)
-            .map(([key, value]) =>
-              key.test(noPrefix) ? value[0] : this.events.get(command)
-            )[0];
-      pluginCall = dpluginCall ? dpluginCall : this.events.get(command);
+          : this.events.get(command);
+      pluginCall = dpluginCall ? dpluginCall : this.caseCmd.has(command) ? { pass: true } : dpluginCall;
+      console.log(pluginCall)
       if (!pluginCall) return;
 
       for (const plugin of pluginCall) {

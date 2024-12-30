@@ -29,7 +29,7 @@ setInterval(() => store.writeToFile(pathStore), 30_000); */
 
 export default async function connectToWhatsApp() {
     try {
-        const { state, saveCreds } = await useMultiFileAuthState(path.resolve((config.options?.sessionName || "lorraine_sessions")));
+        const { state, saveCreds } = await useMultiFileAuthState(path.resolve("src/" + (config.options?.sessionName || "lorraine_sessions")));
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`[ ${colors.green("System")} ] Menggunakan WA v${version.join(".")}, versi terbaru: ${isLatest ? "Ya" : "Tidak"}`);
 
@@ -44,13 +44,13 @@ export default async function connectToWhatsApp() {
             browser: Browsers.ubuntu("Chrome"),
             msgRetryCounterCache,
             generateHighQualityLinkPreview: true,
-            getMessage: async (key) => {
-                const msg = await store.loadMessage(key.remoteJid, key.id);
-                return msg?.message;
-            },
+            // getMessage: async (key) => {
+            //     const msg = await store.loadMessage(key.remoteJid, key.id);
+            //     return msg?.message;
+            // },
         });
 
-        store.bind(sock.ev);
+        // store.bind(sock.ev);
 
         if (pairingCode && !sock.authState.creds.registered) {
             const phoneNumber = config.options.pairingNumber.replace(/[^0-9]/g, "");

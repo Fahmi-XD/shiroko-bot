@@ -1,14 +1,12 @@
-import config from "../../src/settings/config.js"
-import axios from "axios";
-import baileys, {
+const axios = require("axios");
+const {
   generateWAMessageFromContent,
   proto,
   prepareWAMessageMedia
-} from "baileys";
-import fs from "fs";
-import path from "path";
+} = require("baileys");
 
-export default handler => {
+/** Jika ingin mengambil settingan dari file config.js, gunakan parameter kedua seperti ini. */
+module.exports = (handler, config) => {
   handler.add({
     cmd: [["config", "hc"]],
     cats: ["Proxy"],
